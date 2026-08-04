@@ -121,7 +121,7 @@ Hassasiyeti artırmak/azaltmak için: [docs/SORUN-GIDERME.md](docs/SORUN-GIDERME
 
 ## Durum
 
-**v1 prototip.** Çalışıyor, ancak gerçek bir sunumda güvenilecek kararlılıkta değil — gürültülü ortamda kaçırma oranı hâlâ yüksek ve çift şıklatma zamanlaması ayar bekliyor. Firmware'de bunu ölçmek için bir teşhis modu var (`SNAP_DIAG`); hangi ölçünün kaç kez elediğini raporluyor. Bkz. [docs/SORUN-GIDERME.md](docs/SORUN-GIDERME.md#teşhis-modu--ayarlanacak-parametreyi-bulma)
+**v1 prototip.** Çalışıyor, ama halen tam kararlılıkta olduğu söylenemez v2 de eklemler yeni mekanik değişiklikler daha profosyonel ve ergonomik bir tasarıma geçilecek bu halen bir prototip.
 
 ---
 
