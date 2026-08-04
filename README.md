@@ -6,6 +6,8 @@
 
 Sürücü yok, eşlik eden uygulama yok, kablo yok. Windows / macOS / Linux / Android / iOS — hepsi cihazı Bluetooth klavye olarak görür, PowerPoint'ten Google Slides'a her yerde çalışır.
 
+<img src="docs/images/cihaz-genel.jpg" width="380" alt="SnapSlide cihazı">
+
 ---
 
 ## Neden ilginç?
@@ -22,6 +24,10 @@ Sunum yaparken elinizde klikır tutmak zorunda kalmazsınız. Ama asıl teknik p
 | **Onset oranı** (RMS / uyarlanabilir gürültü tabanı) | "Ortama göre ani sıçrama" — sessiz ve gürültülü odada aynı davranır |
 
 Buna MPU6050'den gelen **bilek hareketi doğrulaması** eklenir: sınırdaki sesler için hareket şartı aranır, çok net şıklatmalar tek başına kabul edilir.
+
+<img src="docs/images/bilekte-kullanim.jpg" width="380" alt="SnapSlide bilekte kullanımda">
+
+Cihaz bileğe takılır; elin serbest kalır.
 
 ---
 
@@ -48,6 +54,12 @@ Buna MPU6050'den gelen **bilek hareketi doğrulaması** eklenir: sınırdaki ses
 | Durum LED'i | Dahili WS2812 | GPIO48 |
 
 > ⚠️ **Motor doğrudan GPIO'ya bağlanmaz.** MOSFET sürücü + flyback diyot + gate pull-down direnci gerekir. Ayrıntılar ve şema: **[docs/DONANIM.md](docs/DONANIM.md)**
+
+Tam malzeme listesi (adet, model, alternatifler): **[docs/MALZEME.md](docs/MALZEME.md)**
+
+<img src="docs/images/pcb-ust-yuz.jpg" width="620" alt="Kart üst yüzü: ESP32-S3, MPU6050, sürücü transistörü">
+
+Delikli plaket üzerine kurulu; kart, LiPo pil ve saat kayışı üç katlı bir sandviç oluşturuyor.
 
 ---
 
@@ -102,7 +114,14 @@ Hassasiyeti artırmak/azaltmak için: [docs/SORUN-GIDERME.md](docs/SORUN-GIDERME
 
 - **[docs/MIMARI.md](docs/MIMARI.md)** — sinyal işleme zinciri, görev yapısı, karar mekanizması
 - **[docs/DONANIM.md](docs/DONANIM.md)** — bağlantı şeması, motor sürücü devresi, güç mimarisi
+- **[docs/MALZEME.md](docs/MALZEME.md)** — malzeme listesi ve yerleşim fotoğrafları
 - **[docs/SORUN-GIDERME.md](docs/SORUN-GIDERME.md)** — bağlantı, algılama ve motor sorunları için teşhis rehberi
+
+---
+
+## Durum
+
+**v1 prototip.** Çalışıyor, ancak gerçek bir sunumda güvenilecek kararlılıkta değil — gürültülü ortamda kaçırma oranı hâlâ yüksek ve çift şıklatma zamanlaması ayar bekliyor. Firmware'de bunu ölçmek için bir teşhis modu var (`SNAP_DIAG`); hangi ölçünün kaç kez elediğini raporluyor. Bkz. [docs/SORUN-GIDERME.md](docs/SORUN-GIDERME.md#teşhis-modu--ayarlanacak-parametreyi-bulma)
 
 ---
 

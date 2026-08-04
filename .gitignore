@@ -18,3 +18,8 @@ compile_commands.json
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Fotograf kaynaklari: HEIC'i GitHub markdown'da GOSTERMEZ, tarayicilarin
+# cogu da acmaz. Repoya yalnizca donusturulmus .jpg surumleri girer;
+# orijinaller diskte kalir.
+docs/images/*.heic

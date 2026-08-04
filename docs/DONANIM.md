@@ -1,5 +1,9 @@
 # Donanım Rehberi
 
+Malzeme listesi için: **[MALZEME.md](MALZEME.md)**
+
+![Kart üst yüzü](images/pcb-ust-yuz.jpg)
+
 ## Pin bağlantıları
 
 | İşlev | ESP32-S3 Pin | Not |
@@ -88,6 +92,12 @@ Titreşim motoru mikrofonun yanındaki **mekanik bir gürültü kaynağıdır**.
 - Mikrofonu motordan mümkün olduğunca uzağa koyun
 - Aralarına yumuşak bir ayırıcı (köpük/silikon) yerleştirin
 - Mikrofonun ses deliğini kasa ile tıkamayın
+
+---
+
+Motor plaketin alt yüzünde, mikrofon ise kablo ucunda ayrı duruyor:
+
+![Kart alt yüzü ve titreşim motoru](images/pcb-alt-yuz.jpg)
 
 ---
 
