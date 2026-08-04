@@ -10,9 +10,9 @@ Sürücü yok, eşlik eden uygulama yok, kablo yok. Windows / macOS / Linux / An
 
 ---
 
-## Neden ilginç?
+## Neden SnapSlide?
 
-Sunum yaparken elinizde klikır tutmak zorunda kalmazsınız. Ama asıl teknik problem şu: **parmak şıklatması ile alkışı, öksürüğü, kapı çarpmasını ve motorun kendi titreşimini ayırt etmek** — hem de 240 MHz'lik bir mikrodenetleyicide, gerçek zamanlı olarak.
+Sunum sırasında standart bir sunum kumandası (presenter) kullanmak, konuşmacının bir elini tamamen kısıtlayarak beden dilini ve jestlerini doğal bir şekilde kullanmasını engeller. Bu proje; el hareketleriyle slayt kontrolü sağlama fikrinden yola çıkarak, konuşmacının hareket özgürlüğünü artırmayı ve slayt geçişlerini dinleyiciler için ilgi çekici hale getirerek sunum sırasındaki dikkat dağınıklıklarını en aza indirmeyi hedefleyen bir çözümdür.
 
 Çözüm dört sinyalin birlikte değerlendirilmesi:
 
