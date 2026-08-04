@@ -54,7 +54,7 @@ Buna MPU6050'den gelen **bilek hareketi doğrulaması** eklenir: sınırdaki ses
 ## Kurulum
 
 ```bash
-git clone https://github.com/egulb/Snapslide.git
+git clone https://github.com/egulbay/Snapslide.git
 cd Snapslide
 pio run --target upload      # PlatformIO
 pio device monitor           # 115200 baud
