@@ -412,9 +412,14 @@ struct SnapAudioResult {
   float crest;
   float onset;          // rms / uyarlanabilir gurultu tabani
   bool valid;           // yeterli ornek okundu mu
+  bool muted;           // motor sagirlastirmasi aktifti
   bool isSnapStrong;    // cok net siklatma -> hareket dogrulamasi gerekmez
   bool isSnapLike;      // normal esik (1. siklatma, hareketle birlikte)
   bool isSnapLikeLoose; // gevsek esik (2. siklatma -> daha hassas)
+  // O an gecerli esikler. Teshis modu bunlari olculen degerlerin yanina
+  // yazdirabilsin diye disari veriliyor - esik mantigi tek yerde kalir,
+  // teshis kodunda kopyalanmaz.
+  float thRatio, thRms, thCrest, thOnset;
 };
 
 // Ortusmeli analiz icin kayan pencere. Her cagrida yalnizca AUDIO_HOP kadar
@@ -427,7 +432,7 @@ static bool audioRingPrimed = false;
 static float noiseEma = 0;
 
 SnapAudioResult analyzeSnapAudio() {
-  SnapAudioResult result = {0, 0, 0, 0, 0, false, false, false, false};
+  SnapAudioResult result = {}; // tum alanlar sifir/false
 
   int32_t rawSamples[AUDIO_HOP];
   size_t bytesRead = 0;
@@ -500,6 +505,7 @@ SnapAudioResult analyzeSnapAudio() {
   // Motor calisirken (ve hemen sonrasinda) mikrofon sagir: ne karar ver ne de
   // gurultu tabanini guncelle.
   bool muted = ((long)(millis() - audioMuteUntil) < 0);
+  result.muted = muted;
 
   // ONSET (ani darbe) OLCUSU. Eski "spike" testi bozuktu: sabit 50.0 esigi
   // yuzunden sessiz bir odada baseline hicbir zaman 50'yi gecmedigi icin test
@@ -519,14 +525,23 @@ SnapAudioResult analyzeSnapAudio() {
       noiseEma = noiseEma * 0.80f + result.rms * 0.20f;
   }
 
-  if (calibrated && !muted) {
-    float crestRef = fmaxf(calSnapCrestAvg * 0.45f, 2.0f);
+  if (calibrated) {
+    // Esikler her zaman hesaplanir (sagirken bile) - teshis modu neyin
+    // elendigini raporlayabilsin diye.
+    result.thCrest = fmaxf(calSnapCrestAvg * 0.45f, 2.0f);
+    result.thRatio = calSnapRatioAvg * 0.32f;
+    result.thRms = calSnapRmsAvg * 0.18f;
+    result.thOnset = 3.0f;
+  }
 
-    bool ratioOK = result.snapBandRatio > (calSnapRatioAvg * 0.32f);
+  if (calibrated && !muted) {
+    float crestRef = result.thCrest;
+
+    bool ratioOK = result.snapBandRatio > result.thRatio;
     bool notClap = result.lowBandRatio < 0.68f;
-    bool rmsOK = result.rms > (calSnapRmsAvg * 0.18f);
+    bool rmsOK = result.rms > result.thRms;
     bool crestOK = result.crest > crestRef;
-    bool onsetOK = result.onset > 3.0f;
+    bool onsetOK = result.onset > result.thOnset;
 
     result.isSnapLike = ratioOK && notClap && rmsOK && crestOK && onsetOK;
 
@@ -574,6 +589,159 @@ MotionData readMotion() {
   m.accMag = sqrtf(m.ax * m.ax + m.ay * m.ay + m.az * m.az);
   return m;
 }
+
+// ==================== TESHIS MODU ====================
+// Amaci: "bazen algilamiyor" gibi belirsiz bir sikayeti, AYARLANACAK TEK
+// PARAMETREYE indirgemek. Sesli her olay icin hangi olcunun eledigini yazar
+// ve 3 saniyede bir sayac ozeti dokerek darbogazi gorunur kilar.
+//
+// Uretim icin 0 yapin (seri trafigi ve CPU yuku duser).
+#define SNAP_DIAG 1
+
+#if SNAP_DIAG
+// Bu esigin uzerindeki her ses "aday" sayilir ve raporlanir. Gercek karar
+// esigi 3.0; 1.8 secilerek KIL PAYI KACIRILANLAR da gorunur oluyor.
+#define DIAG_MIN_ONSET 1.8f
+// Bir siklatma 8 ms'lik birden fazla kareye yayilir. Olayi topla, en yuksek
+// degerleri tut, tek satir yaz - aksi halde her siklatma 5-6 satir doker.
+#define DIAG_EVENT_MS 120
+
+static struct {
+  bool active;
+  unsigned long startMs;
+  float onset, crest, ratio, low, rms;
+  float thOnset, thCrest, thRatio, thRms; // olay anindaki gecerli esikler
+  bool like, strong, loose, motion, muted;
+} dEv;
+
+// Sayaclar: hangi olcu kac kez eledi
+static uint32_t dTotal, dRedOnset, dRedCrest, dRedRatio, dRedRms, dRedClap,
+    dRedMotion, dRedMuted, dOkStrong, dOkNormal;
+
+// 1. siklatmadan sonraki adaylarin zamanlamasini olcmek icin. Cift siklatma
+// sorununun tesbiti tam olarak bu: kullanicinin dogal iki-siklatma araligi
+// DOUBLE_SNAP_WINDOW'un icine dusuyor mu?
+static unsigned long diagFirstSnapAt = 0;
+
+static void diagEmit() {
+  dTotal++;
+
+  char verdict[96];
+  if (dEv.muted) {
+    dRedMuted++;
+    snprintf(verdict, sizeof(verdict), "SAGIR (motor gurultu maskesi)");
+  } else if (dEv.strong) {
+    dOkStrong++;
+    snprintf(verdict, sizeof(verdict), "KABUL (guclu - hareket aranmadi)");
+  } else if (dEv.like) {
+    if (dEv.motion) {
+      dOkNormal++;
+      snprintf(verdict, sizeof(verdict), "KABUL (normal + hareket)");
+    } else {
+      dRedMotion++;
+      snprintf(verdict, sizeof(verdict), "RED: ses yeterli ama HAREKET yok");
+    }
+  } else {
+    // Hangi olcu(ler) eledi? Birden fazla olabilir - hepsini say, cunku
+    // ayarlanacak parametre "en cok eleyen" olandir.
+    char why[64] = "";
+    size_t p = 0;
+    if (dEv.onset <= dEv.thOnset) {
+      dRedOnset++;
+      p += snprintf(why + p, sizeof(why) - p, "onset ");
+    }
+    if (dEv.crest <= dEv.thCrest) {
+      dRedCrest++;
+      p += snprintf(why + p, sizeof(why) - p, "crest ");
+    }
+    if (dEv.ratio <= dEv.thRatio) {
+      dRedRatio++;
+      p += snprintf(why + p, sizeof(why) - p, "ratio ");
+    }
+    if (dEv.rms <= dEv.thRms) {
+      dRedRms++;
+      p += snprintf(why + p, sizeof(why) - p, "rms ");
+    }
+    if (dEv.low >= 0.68f) {
+      dRedClap++;
+      p += snprintf(why + p, sizeof(why) - p, "alkis ");
+    }
+    snprintf(verdict, sizeof(verdict), "RED: %s", why[0] ? why : "?");
+  }
+
+  // 1. siklatmadan sonraki adaylar icin araligi da yaz - cift siklatma
+  // ayarinin dayanacagi tek sayi bu.
+  char gap[80] = "";
+  if (diagFirstSnapAt != 0) {
+    unsigned long d = dEv.startMs - diagFirstSnapAt;
+    snprintf(gap, sizeof(gap), " | 1.'den +%lums pencere=%s gevsek=%s", d,
+             (d <= DOUBLE_SNAP_WINDOW) ? "ACIK" : "KAPALI",
+             dEv.loose ? "gecti" : "kaldi");
+  }
+
+  // Her olcu "olculen/esik" formatinda: hangisinin ne kadar kil payi kaldigi
+  // tek bakista gorunur.
+  Serial.printf("[DIAG] onset=%.1f/%.1f crest=%.1f/%.1f ratio=%.2f/%.2f "
+                "rms=%.0f/%.0f low=%.2f hrk=%s -> %s%s\n",
+                dEv.onset, dEv.thOnset, dEv.crest, dEv.thCrest, dEv.ratio,
+                dEv.thRatio, dEv.rms, dEv.thRms, dEv.low,
+                dEv.motion ? "E" : "H", verdict, gap);
+}
+
+static void diagService(const SnapAudioResult &a, bool motionOK) {
+  if (!calibrated || !a.valid)
+    return;
+
+  // Aralik olcumunu 2.5 sn sonra birak. Pencere kapandiktan SONRA gelen
+  // adaylar da raporlansin diye DOUBLE_SNAP_WINDOW'dan belirgin uzun tutuldu -
+  // "2. siklatmam hep gec kaliyor" durumunu ancak boyle gorebiliriz.
+  if (diagFirstSnapAt != 0 && (millis() - diagFirstSnapAt) > 2500)
+    diagFirstSnapAt = 0;
+
+  if (a.onset >= DIAG_MIN_ONSET) {
+    if (!dEv.active) {
+      dEv.active = true;
+      dEv.startMs = millis();
+      dEv.onset = dEv.crest = dEv.ratio = dEv.rms = 0;
+      dEv.low = 1.0f;
+      dEv.like = dEv.strong = dEv.loose = dEv.motion = dEv.muted = false;
+    }
+    dEv.thOnset = a.thOnset;
+    dEv.thCrest = a.thCrest;
+    dEv.thRatio = a.thRatio;
+    dEv.thRms = a.thRms;
+    // Olay boyunca en iyi degerleri tut (tepe tutma).
+    if (a.onset > dEv.onset) dEv.onset = a.onset;
+    if (a.crest > dEv.crest) dEv.crest = a.crest;
+    if (a.snapBandRatio > dEv.ratio) dEv.ratio = a.snapBandRatio;
+    if (a.rms > dEv.rms) dEv.rms = a.rms;
+    if (a.lowBandRatio < dEv.low) dEv.low = a.lowBandRatio;
+    dEv.like |= a.isSnapLike;
+    dEv.strong |= a.isSnapStrong;
+    dEv.loose |= a.isSnapLikeLoose;
+    dEv.motion |= motionOK;
+    dEv.muted |= a.muted;
+  }
+
+  if (dEv.active && (millis() - dEv.startMs) >= DIAG_EVENT_MS) {
+    diagEmit();
+    dEv.active = false;
+  }
+}
+
+static void diagSummary() {
+  if (dTotal == 0)
+    return;
+  Serial.printf("[DIAG-OZET] aday=%lu kabul=%lu(guclu %lu) | RED: onset=%lu "
+                "crest=%lu ratio=%lu rms=%lu alkis=%lu hareket=%lu sagir=%lu\n",
+                (unsigned long)dTotal,
+                (unsigned long)(dOkStrong + dOkNormal), (unsigned long)dOkStrong,
+                (unsigned long)dRedOnset, (unsigned long)dRedCrest,
+                (unsigned long)dRedRatio, (unsigned long)dRedRms,
+                (unsigned long)dRedClap, (unsigned long)dRedMotion,
+                (unsigned long)dRedMuted);
+}
+#endif // SNAP_DIAG
 
 // ==================== KALIBRASYON ====================
 void runCalibration() {
@@ -971,9 +1139,24 @@ void sensorTask(void *p) {
                     hidSubscribed ? "evet" : "hayir",
                     advOn ? "acik" : "KAPALI",
                     (unsigned long)motorSwRescues);
+#if SNAP_DIAG
+      diagSummary();
+#endif
     }
 
-    bool isActionCooldown = (millis() - lastActionTime < ACTION_COOLDOWN_MS);
+    bool isActionCooldownRaw = (millis() - lastActionTime < ACTION_COOLDOWN_MS);
+
+#if SNAP_DIAG
+    // Teshis, karar mantigindan ONCE ve ondan BAGIMSIZ calisir: cooldown
+    // sirasinda elenen adaylari da gormek gerekiyor (cift siklatmanin
+    // "olu bolge"ye dusup dusmedigini ancak boyle anlayabiliriz).
+    {
+      bool motionDbg = !mpuFound || ((millis() - lastMotionTime) < MOTION_WINDOW_MS);
+      diagService(audio, motionDbg);
+    }
+#endif
+
+    bool isActionCooldown = isActionCooldownRaw;
 
     // GUVENLIK AGI: MPU bulunamazsa hareket sarti otomatik saglanmis sayilir
     // -> snap yine calisir (tamamen sese dayali fallback).
@@ -991,6 +1174,9 @@ void sensorTask(void *p) {
         snapCount = 1;
         snapWindowStart = millis();
         lastSnap = millis();
+#if SNAP_DIAG
+        diagFirstSnapAt = millis(); // sonraki adaylarin araligi olculecek
+#endif
         Serial.printf("[SNAP!] 1. Siklatma (onset=%.1f crest=%.1f %s)\n",
                       audio.onset, audio.crest,
                       audio.isSnapStrong ? "GUCLU" : "hareket+ses");

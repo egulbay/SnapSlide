@@ -69,6 +69,51 @@ Kopma sebebi kodları:
 
 ---
 
+## Teşhis modu — ayarlanacak parametreyi bulma
+
+"Bazen algılamıyor" ayarlanabilir bir şikayet değil. Teşhis modu bunu **hangi ölçünün kaç kez elediği** sayısına indirger.
+
+`src/main.cpp` başında açıktır (üretim için `0` yapın):
+
+```c
+#define SNAP_DIAG 1
+```
+
+Sesli her olay için tek satır düşer — her ölçü `ölçülen/eşik` formatında:
+
+```
+[DIAG] onset=2.4/3.0 crest=6.1/2.8 ratio=0.38/0.19 rms=310/180 low=0.21 hrk=E -> RED: onset
+[DIAG] onset=7.8/3.0 crest=7.4/2.8 ratio=0.51/0.19 rms=890/180 low=0.14 hrk=E -> KABUL (güçlü)
+```
+
+Ve 3 saniyede bir özet:
+
+```
+[DIAG-OZET] aday=31 kabul=22(guclu 14) | RED: onset=6 crest=1 ratio=2 rms=0 alkis=0 hareket=3 sagir=1
+```
+
+**Nasıl okunur:** `RED:` satırındaki **en büyük sayı** ayarlanacak parametredir. Yukarıdaki örnekte `onset=6` baskın → `analyzeSnapAudio()` içinde `result.thOnset = 3.0f` değerini 2.4'e indirin.
+
+Eşiği ölçülen değerlerin **hemen altına** çekin, sıfıra değil: reddedilen satırlardaki `onset` değerleri 2.3–2.7 arasındaysa 2.2 iyi bir seçimdir. Her seferinde **tek parametre** değiştirin ve testi tekrarlayın.
+
+`hareket=N` baskınsa ses yeterli ama IMU doğrulaması eliyor demektir → `MOTION_GYRO_TH` değerini düşürün (0.9 → 0.6) veya `MOTION_WINDOW_MS`'i artırın (400 → 600).
+
+`sagir=N` baskınsa şıklatmalarınız motorun titreşim maskesine denk geliyor → `MOTOR_MUTE_TAIL_MS` (180) veya `ACTION_COOLDOWN_MS` (900) çok uzun.
+
+### Çift şıklatma zamanlaması
+
+1. şıklatmadan sonraki adaylar aralıklarıyla birlikte raporlanır:
+
+```
+[DIAG] onset=5.2/3.0 ... -> RED: ... | 1.'den +780ms pencere=KAPALI gevsek=gecti
+```
+
+`pencere=KAPALI` **ve** `gevsek=gecti` görüyorsanız teşhis nettir: ikinci şıklatmanız algılanacak kadar güçlü ama **çok geç geliyor.** `DOUBLE_SNAP_WINDOW` değerini ölçülen aralığın üzerine çıkarın.
+
+> ⚠️ **Ölü bölge:** Tek şıklatma penceresi kapanınca (650 ms) komut gönderilir ve `ACTION_COOLDOWN_MS` (900 ms) başlar. Yani **650–1550 ms arasına düşen ikinci şıklatma tamamen yutulur.** Doğal çift şıklatma ritminiz 650 ms'den yavaşsa çift şıklatma neredeyse hiç tutmaz. `DOUBLE_SNAP_WINDOW`'u ölçtüğünüz aralığa göre ayarlamak bunun tek çözümüdür — ama unutmayın, bu değer aynı zamanda **tek şıklatmanın gecikmesidir.**
+
+---
+
 ## Algılama sorunları
 
 ### Şıklatmayı hiç algılamıyor
