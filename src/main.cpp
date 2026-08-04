@@ -1175,18 +1175,29 @@ void loop() {
     bleHealthCheck();
   }
 
+  // LED'e YALNIZCA GECISLERDE dokunulur. Her turda ledOff() cagirmak saniyede
+  // 200 RMT islemi demekti; hem bosuna CPU harciyor hem de kalibrasyon
+  // sirasinda sensorTask'in LED yazimlariyla ayni RMT kanal mutex'i icin
+  // yarisiyordu (motor donmasinin kok nedeni tam olarak o mutex'ti - oraya
+  // gereksiz trafik bindirmenin alemi yok).
+  static bool actionLedOn = false;
+
   // 1) COOLDOWN: komut gonderildikten sonra korluk suresi
   if (millis() - lastActionTime < ACTION_COOLDOWN_MS) {
     portENTER_CRITICAL(&snapMux);
     finalSnapResult = SNAP_NONE;
     portEXIT_CRITICAL(&snapMux);
-    // LED'i aksiyon sonrasi kapat (bloklamadan)
-    if (millis() - lastActionTime > 250)
+    if (actionLedOn && millis() - lastActionTime > 250) {
       ledOff();
+      actionLedOn = false;
+    }
     delay(5);
     return;
   }
-  ledOff();
+  if (actionLedOn) {
+    ledOff();
+    actionLedOn = false;
+  }
 
   // 2) SNAP SONUCUNU AL
   SnapResult localResult = SNAP_NONE;
@@ -1210,6 +1221,7 @@ void loop() {
     else
       Serial.println("[AKSIYON] (BLE bagli degil - tus gonderilmedi)");
     ledOn(0, 40, 0);
+    actionLedOn = true;
     vibrateAsync(120, 1);
   } else if (localResult == SNAP_DOUBLE) {
     Serial.println("[AKSIYON] Cift siklatma -> SOL OK");
@@ -1219,6 +1231,7 @@ void loop() {
     else
       Serial.println("[AKSIYON] (BLE bagli degil - tus gonderilmedi)");
     ledOn(60, 0, 60);
+    actionLedOn = true;
     vibrateAsync(80, 2);
   }
 
