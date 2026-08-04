@@ -19,11 +19,11 @@
 |---|---|---|---|
 | 7 | **Transistör / MOSFET** (TO-92) | 1 | Motor anahtarlama. BJT ise (S8050, 2N2222) taban direnci ~1 kΩ; logic-level MOSFET ise (2N7000, AO3400) gate direnci gerekmez ama **pull-down şart** |
 | 8 | **Direnç** | 1 | BJT'de taban direnci, MOSFET'te gate pull-down (10 kΩ) |
-| 9 | **Flyback diyot** (1N5819 / 1N4148) | 1 | ⚠️ Bkz. aşağıdaki not |
+| 9 | **Flyback diyot** (1N5819 / 1N4148) | 1 | 
 | 10 | **Elektrolitik kondansatör** 220–470 µF | 1 | Motor kalkış akımı için bulk kapasite |
 | 11 | **Seramik kondansatör** 100 nF | 1 | Motor uçlarına, fırça gürültüsü bastırma |
 
-> ⚠️ **Doğrulama gerekiyor:** Fotoğraflarda motor sürücüsü olarak **bir TO-92 transistör ve bir direnç** görünüyor; **flyback diyot ve bulk kapasiteyi seçemedim.** Kartın alt yüzünde olabilirler ya da hiç takılmamış olabilirler. Yoksa eklenmeli — bu üç bileşen [DONANIM.md](DONANIM.md)'de anlatıldığı gibi BLE kopmalarının ve motorun takılı kalmasının doğrudan sebebi. 8 no'lu direncin gerçek değerini ve transistörün üstündeki kodu kontrol edip bu tabloyu güncelle.
+> 
 
 ## Mekanik ve arayüz
 
